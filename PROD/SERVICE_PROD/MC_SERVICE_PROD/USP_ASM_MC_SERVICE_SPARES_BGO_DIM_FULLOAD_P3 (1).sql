@@ -8,6 +8,7 @@ alter PROC [dbo].[USP_ASM_MC_SERVICE_SPARES_BGO_DIM_FULLOAD_P3]
 AS
 BEGIN
 /*******************************************HISTORY**************************************************/
+	-- Test Comments
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*    DATE   	|	CREATED/MODIFIED BY		|CHANGE DESCRIPTION			    */
@@ -353,4 +354,5 @@ INNER JOIN #ASDDealerMapping A on B.ASD_Dealercode = A.ASD_DEALERCODE
 PRINT('ASM_MC_SERVICE_ASD_ORD_INV_DIM TABLE LOADED')
 
 END
+
 GO

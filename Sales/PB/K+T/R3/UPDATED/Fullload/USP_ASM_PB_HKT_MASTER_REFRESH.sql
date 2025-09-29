@@ -11,7 +11,6 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------*/
 /*	2025-08-19	|	 Lachman		|  Branch logic has been updated to include inactive Dealer that are not present in the Vehicle Mapping table */
 /*  2025-09-25 	|	Lachmanna		        | Branch logic has been updated to Excluded inactive branches CR      */
-/*  2025-09-25 	|	Lachmanna		        | Branch logic has been updated to Excluded inactive branches CR      */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/

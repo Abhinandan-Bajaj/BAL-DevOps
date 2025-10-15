@@ -1,1 +1,0 @@
-select * from LSQ_UB_PROSPECT_BASE

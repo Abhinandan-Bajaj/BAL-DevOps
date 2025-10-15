@@ -20,7 +20,7 @@ BEGIN
 /*  2025-06-18	|	Lachmanna		 | SameDay booking,Retail and Enquiry     */
 /*  2025-09-05	|	Ashwini		 | DueDateLogic Update   */
 /*  2025-10-08	|	Ashwini		 | CRE logic update along with DueDateLogic    */
-/*  2025-10-13	|	Lachmanna		 | Added lost enquiry     */
+/*  2025-10-13	|	Lachmanna		 | Added lost enquiry  CR    */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -395,7 +395,7 @@ update B set B.FK_DEALERCODE=C.PK_DEALERCODE from ASM_UB_ENQUIRY_STG B INNER JOI
 
 ------------------------------------------------------------------------------------------------------------
   /* Step 4 : Loading Enquiry Fact*/
-Truncate table ASM_UB_ENQUIRY_FACT
+Truncate table ASM_UB_ENQUIRY_FACT 
 
 INSERT INTO ASM_UB_ENQUIRY_FACT
 SELECT * FROM ASM_UB_ENQUIRY_STG

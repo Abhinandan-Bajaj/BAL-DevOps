@@ -21,7 +21,7 @@ BEGIN
 /*  2025-06-18	|	Lachmanna		 | SameDay booking,Retail and Enquiry     */
 /*  2025-09-05	|	Ashwini		 | UB duedate Followup logic  update    */
 /*  2025-10-08	|	Ashwini		 | UB duedate Followup logic  with CRE UPDATE    */
-/*  2025-10-13	|	Lachmanna		 | Added lost enquiry     */
+/*  2025-10-13	|	Lachmanna		 | Added lost enquiry CR     */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -495,7 +495,7 @@ drop table #Sessiontime
         0,
         0,
         @Status2,
-        @ErrorMessage2;
+        @ErrorMessage2; 
 
 END
 

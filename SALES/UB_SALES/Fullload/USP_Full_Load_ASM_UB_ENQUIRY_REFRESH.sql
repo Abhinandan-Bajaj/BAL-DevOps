@@ -20,7 +20,7 @@ BEGIN
 /*  2025-06-18	|	Lachmanna		 | SameDay booking,Retail and Enquiry     */
 /*  2025-09-05	|	Ashwini		 | DueDateLogic Update   */
 /*  2025-10-08	|	Ashwini		 | CRE logic update along with DueDateLogic    */
-/*  2025-10-13	|	Ashwini		 | CRE logic update along with DueDateLogic    */
+/*  2025-10-13	|	Lachmanna		 | Added lost enquiry     */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -109,9 +109,6 @@ CAST(DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date)))AS DATE)=  CA
 CAST(DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date)))AS DATE)= CAST(DATEADD(mi,30,(DATEADD(hh,5,ACTEXT.mx_Custom_28)))AS DATE) then 'YES' ELSE 'NO' end as SameDayRetail
 ,CASE WHEN  UPPER(UB.ProspectStage) IN ('LOST' ,'AUTO - CLOSED' ,'CLOSED' ,'LOST TO COMPETITION' ,'LOST TO CO-DEALER') and 
 CAST(DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date)))AS DATE)= CAST(DATEADD(mi,30,(DATEADD(hh,5,ACTEXT.mx_Custom_27)))AS DATE)  then 'YES' ELSE 'NO' end as SameDayClosed
-
-
-/*lachmanna DEV columns not in PROD yet*/
 ,EXTUB.mx_Lost_to_Competition_Make	as COMPETITION_BRAND
 ,EXTUB.mx_Competition_Model as 	COMPETITION_MODEL
 ,EXTUB.mx_Reason_for_Choosing_Competition as 	REASON_FOR_CHOOSING_COMPETITION
@@ -121,16 +118,13 @@ CAST(DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date)))AS DATE)= CAS
 	WHEN UPPER(UB.ProspectStage) IN ('LOST' ,'AUTO - CLOSED','AUTO-CLOSED' ,'AUTO- CLOSED','CLOSED' ,'LOST TO COMPETITION' ,'LOST TO CO-DEALER','LOST TO CO-DEALER/CO- BRANCH','FUTURE RETARGETING') THEN 'Closed' 
 	WHEN UPPER(UB.ProspectStage) IN ('OPEN', 'CONTACTED', 'QUALIFIED', 'TEST RIDE BOOKED', 'TEST RIDE CANCELLED', 'TEST RIDE RESCHEDULED', 'VISITED', 'SALES DEMO', 'TEST RIDE COMPLETED', 'FINANCE', 'EXCHANGE', 'BOOKING IN PROGRESS ','BOOKING INPROGRESS', 'BOOKING FAILED','Intent to Book') THEN 'Open' END AS EnquiryStatus
 ,ACTEXT.mx_Custom_2 as OPPORTUNITY_STATUS
-,DATEADD(mi,30,(DATEADD(hh,5,LSQ_UTBASE.DueDate))) as Duedate
-,CM.CODE as DEALERCODE
------------------------------------
 FROM LSQ_UB_PROSPECT_BASE UB
 
-JOIN BRANCH_MASTER BM ON 
-BM.CODE=UB.mx_Branch_Code
+JOIN BRANCH_MASTER BM WITH (NOLOCK)
+ON BM.CODE=UB.mx_Branch_Code
 
-JOIN COMPANY_MASTER CM ON 
-CM.COMPANYID=BM.COMPANYID
+JOIN COMPANY_MASTER CM WITH (NOLOCK)
+ON CM.COMPANYID=BM.COMPANYID
 
 LEFT JOIN LSQ_UB_PROSPECT_EXTENSIONBASE EXTUB ON 
 UB.ProspectID=EXTUB.ProspectID
@@ -147,7 +141,8 @@ AND ACTEXT.ActivityEvent=12000
 LEFT JOIN (select DueDate,OwnerId,RelatedEntityId,TaskType,CreatedON  from
  (SELECT DueDate,OwnerId,RelatedEntityId, TaskType,CreatedON, ROW_NUMBER()OVER(PARTITION BY RelatedEntityId ORDER BY CreatedON Asc)RNK                  
   FROM LSQ_UB_UserTask_Base
-  WHERE TaskType ='f0dc0c93-cd31-11ed-b683-02b0de8eaa1e'
+  WHERE TaskType in (select CODE from DM_CodeInclusionExclusion_Master where TypeFlag='Tasktype_002' and IncORExc='Include')  
+  --TaskType ='f0dc0c93-cd31-11ed-b683-02b0de8eaa1e'
   ) UT
   WHERE RNK = 1 ) LSQ_UTBASE
   ON  --(LSQ_PBASE.OwnerId = LSQ_UTBASE.OwnerId) and
@@ -348,8 +343,8 @@ First_Mode_SubSource
    ISNULL(EXTUB.mx_Qualified_Sub_Source,'Not Available') AS First_Mode_SubSource
 	
 FROM LSQ_UB_PROSPECT_BASE UB
-JOIN BRANCH_MASTER BM ON BM.CODE=UB.mx_Branch_Code
-JOIN COMPANY_MASTER CM ON CM.COMPANYID=BM.COMPANYID
+JOIN BRANCH_MASTER BM WITH (NOLOCK) ON BM.CODE=UB.mx_Branch_Code
+JOIN COMPANY_MASTER CM WITH (NOLOCK) ON CM.COMPANYID=BM.COMPANYID
 LEFT JOIN LSQ_UB_PROSPECT_EXTENSIONBASE EXTUB ON UB.ProspectID=EXTUB.ProspectID
 
 LEFT JOIN LSQ_UB_PROSPECTACTIVITY_BASE ACT ON ACT.RelatedProspectID = UB.ProspectID
@@ -362,9 +357,9 @@ LEFT JOIN LSQ_UB_CUSTOMOBJECTPROSPECTACTIVITY_BASE  LSQ_CUSTPACT
 ON LSQ_CUSTPACT.RelatedProspectActivityID=ACTEXT.RelatedProspectActivityID
 AND LSQ_CUSTPACT.CustomObjectProspectActivityId=ACTEXT.mx_custom_4
 
-LEFT JOIN  ITEM_MASTER IM ON cast(IM.ITEMID as VARCHAR(50))=LSQ_CUSTPACT.mx_CustomObject_7
+LEFT JOIN  ITEM_MASTER IM WITH (NOLOCK) ON cast(IM.ITEMID as VARCHAR(50))=LSQ_CUSTPACT.mx_CustomObject_7
     
-LEFT JOIN ITEMVARMATRIX_MASTER IV ON cast(IV.ITEMVARMATRIXID as VARCHAR(50))=LSQ_CUSTPACT.mx_CustomObject_8
+LEFT JOIN ITEMVARMATRIX_MASTER IV WITH (NOLOCK) ON cast(IV.ITEMVARMATRIXID as VARCHAR(50))=LSQ_CUSTPACT.mx_CustomObject_8
   
 where EXTUB.mx_Dealer_Assignment_Date is not null 
  and CAST (DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date))) AS dATE) BETWEEN '2021-04-01' AND Cast(Getdate()-1 as date)
@@ -396,6 +391,7 @@ DELETE FROM CTE
 update B set B.FK_SKU=C.PK_SKU from ASM_UB_ENQUIRY_STG B INNER JOIN ASM_UB_PRODUCT_SKU_DIM C on (B.SKU=C.SKU_CODE);
 update B set B.FK_MODEL=C.PK_Model_Code from ASM_UB_ENQUIRY_STG B INNER JOIN ASM_UB_PRODUCT_DIM C on (B.MODELCODE=C.MODELCODE);
 update B set B.FK_DEALERCODE=C.PK_DEALERCODE from ASM_UB_ENQUIRY_STG B INNER JOIN ASM_UB_DEALER_MASTER_DIM C on (B.DEALERCODE=C.DEALERCODE);
+
 
 ------------------------------------------------------------------------------------------------------------
   /* Step 4 : Loading Enquiry Fact*/

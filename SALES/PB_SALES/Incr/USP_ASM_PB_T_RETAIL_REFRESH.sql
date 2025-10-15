@@ -1,0 +1,424 @@
+/****** Object:  StoredProcedure [dbo].[USP_Full_Load_ASM_PB_T_RETAIL_REFRESH]    Script Date: 6/16/2025 11:56:36 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+Alter PROC [dbo].[USP_ASM_PB_T_RETAIL_REFRESH] AS
+BEGIN
+
+--***************************START*****************************
+/*******************************************HISTORY**************************************************/
+/*--------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------*/
+/*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION				    */
+/*--------------------------------------------------------------------------------------------------*/
+/*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
+/*--------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------*/
+/*******************************************HISTORY**************************************************/
+--1.Retail Dim:
+
+declare @ASMDim_IMPORTEDDATE date;
+set @ASMDim_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_T_RETAIL_DIM)AS DATE);
+
+declare @ASMFact_IMPORTEDDATE date;
+set @ASMFact_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_T_RETAIL_STG)AS DATE);
+
+
+DECLARE @SPID INT = @@SPID,
+        @sp_name VARCHAR(128) = 'USP_ASM_PB_T_RETAIL_REFRESH';
+
+DECLARE @StartDate_utc1 DATETIME = GETDATE(),
+            @EndDate_utc1 DATETIME,
+			@StartDate_ist1 DATETIME = (DATEADD(mi,30,(DATEADD(hh,5,getdate())))),
+            @EndDate_ist1 DATETIME,
+            @Duration_sec1 bigint,
+			@Duration1 varchar(15),
+			@table_name1 VARCHAR(128) = 'ASM_PB_T_RETAIL_DIM', 
+            @SourceCount1 BIGINT,  
+            @TargetCount1 BIGINT,   
+            @Status1 VARCHAR(10),
+            @ErrorMessage1 VARCHAR(MAX); 
+
+BEGIN TRY
+INSERT INTO ASM_PB_T_RETAIL_DIM
+SELECT DISTINCT 
+RH.HEADERID AS PK_RETAILHEADERID,
+CAST(RH.DOCDATE AS DATE) AS RETAILDATE,
+FM.FINANCECATEGORY AS RETAILFINANCIERCATEGORY,
+RH.MODEOFPURCHASE AS MODEOFPURCHASE,
+ENQUIRY_HEADER.CUSTOMEROWNERSHIPPROFILEID AS ENQUIRYCUSTOMEROWNERSHIP,
+FM.FINANCECOMPANY AS FINANCECOMPANY,
+RH.ISEXCHANGEAPPLICABLE AS EXCHANGESTATUS,
+GETDATE() AS CREATEDDATETIME,
+RH.IMPORTEDDATE,
+RH.CDMS_BATCHNO,
+(CASE
+	WHEN ISNULL(RETAIL_HEADER_EXT.IsInstitutionalSale,0) = 1
+	AND RH.DocType NOT IN (441,1000088) THEN 'Institutional' 
+	WHEN ISNULL(RETAIL_HEADER_EXT.IsInstitutionalSale,0) = 0 AND Len(BRANCH_MASTER.Code) = 10 
+	AND SUBSTRING(BRANCH_MASTER.Code,0,6) = '00000' 
+	AND ((SUBSTRING(BRANCH_MASTER.Code,6,6) BETWEEN '10000' AND '14000') 
+	OR (SUBSTRING(BRANCH_MASTER.Code,6,6) = '25669'))  AND RH.DocType NOT IN (441,1000088) THEN 'Showroom'
+	ELSE 'Command Area' 
+	END) AS SALESCHANNEL
+FROM 
+RETAIL_HEADER RH INNER JOIN COMPANY_MASTER 
+ON (RH.COMPANYID=COMPANY_MASTER.COMPANYID AND COMPANY_MASTER.COMPANYTYPE = 2 )
+INNER JOIN BRANCH_MASTER ON (RH.BRANCHID=BRANCH_MASTER.BRANCHID)
+INNER JOIN RETAIL_LINE ON (RH.HEADERID=RETAIL_LINE.DOCID)
+INNER JOIN ITEM_MASTER IM ON (IM.ItemId=RETAIL_LINE.ItemID)
+INNER JOIN (select *, Row_number() over (partition by MODELCODE order by MODELCODE) as rnk
+	from ASM_PB_HKT_PRODUCT_DIM) PM  
+	ON  PM.Modelcode = IM.Code and PM.BRAND in('TRIUMPH') and rnk = 1
+LEFT JOIN BOOKING_LINE ON (RETAIL_LINE.BOOKINGDATALINEID=BOOKING_LINE.LINEID)
+LEFT JOIN ENQUIRY_LINE ON (BOOKING_LINE.ENQUIRYDATALINEID=ENQUIRY_LINE.LINEID)
+LEFT JOIN ENQUIRY_HEADER ON (ENQUIRY_LINE.DOCID=ENQUIRY_HEADER.HEADERID)
+LEFT JOIN RETAIL_LINE_EXT RLE ON (RETAIL_LINE.LINEID=RLE.LINEID)
+LEFT JOIN FINANCER_MASTER FM ON (RLE.FINANCERCONTACTID=FM.FINANCERID AND FM.ID = (SELECT MAX(FM1.ID) FROM FINANCER_MASTER FM1 WHERE FM.FINANCERID = FM1.FINANCERID)) 
+LEFT OUTER JOIN RETAIL_HEADER_EXT ON (RH.HEADERID=RETAIL_HEADER_EXT.HEADERID)
+WHERE
+--CAST(RH.DOCDATE AS DATE) BETWEEN '2025-06-09' AND Cast(Getdate()-1 as date) AND 
+RH.DOCTYPE=1000079
+AND cast(RH.IMPORTEDDATE as date)>=@ASMDim_IMPORTEDDATE
+
+
+DELETE FROM ASM_PB_T_RETAIL_DIM WHERE RETAILDATE>Cast(Getdate()-1 as date)
+
+--Dedup
+
+  ;WITH CTE AS                  
+ (                  
+  SELECT *,                  
+   ROW_NUMBER()OVER(PARTITION BY PK_RETAILHEADERID ORDER BY IMPORTEDDATE DESC)RNK                   
+  FROM ASM_PB_T_RETAIL_DIM                  
+ )                  
+DELETE FROM CTE                  
+ WHERE RNK<>1;
+
+ 
+----------------------------------Audit Log Target
+    END TRY
+    BEGIN CATCH
+        SET @Status1 = 'FAILURE';
+        SET @ErrorMessage1 = ERROR_MESSAGE();
+        THROW;  
+    END CATCH
+    SET @EndDate_utc1 = GETDATE();
+	SET @EndDate_ist1 = (DATEADD(mi,30,(DATEADD(hh,5,getdate()))));  
+	SET @Duration_sec1 = DATEDIFF(SECOND, @StartDate_ist1, @EndDate_ist1);  -- Add this line
+	SET @Duration1 = CONVERT(VARCHAR(8), DATEADD(SECOND, @Duration_sec1, 0), 108);
+    EXEC [USP_Audit_Balance_Control_Logs] 
+	     @SPID,
+        @sp_name,
+		@table_name1,
+        'Sales',
+        'PB-TRM',
+        @StartDate_utc1,
+        @EndDate_utc1,
+		@StartDate_ist1,
+        @EndDate_ist1,
+        @Duration1,  
+        '0',
+        '0',
+        @Status1,
+        @ErrorMessage1;
+--************************************************************************************************
+--2.Retail Stage:
+--TRUNCATE TABLE ASM_PB_T_RETAIL_STG
+
+
+DECLARE @StartDate_utc2 DATETIME = GETDATE(),
+        @EndDate_utc2 DATETIME,
+	    @StartDate_ist2 DATETIME = (DATEADD(mi,30,(DATEADD(hh,5,getdate())))),
+        @EndDate_ist2 DATETIME,
+		@Duration_sec2 bigint,
+		@Duration2 varchar(15),
+		@table_name2 VARCHAR(128) = 'ASM_PB_T_RETAIL_STG', 
+        @SourceCount2 BIGINT,  
+        @TargetCount2 BIGINT,   
+        @Status2 VARCHAR(10),
+        @ErrorMessage2 VARCHAR(MAX); 
+
+BEGIN TRY
+
+INSERT INTO ASM_PB_T_RETAIL_STG
+SELECT DISTINCT
+CM.CODE AS DEALERCODE,
+IM.CODE+IV.CODE As SKU,
+Cast(0 as int) as FK_DEALERCODE,
+Cast(0 as int) as FK_SKU,
+10002 As FK_TYPE_ID,
+CAST(RH.DOCDATE as Date) AS DATE,
+RL.LINEID AS RETAILLINEID,
+RL.DOCID AS FK_RETAILDOCID,
+CM.COMPANYTYPE AS COMPANYTYPE,
+RH.BRANCHID,
+Count(Distinct RL.SERIALNO) as ACTUALQUANTITY,
+0 AS TARGETQUANTITY,  
+getdate() as LASTUPDATEDDATETIME,
+RH.IMPORTEDDATE,
+RH.CDMS_BATCHNO,
+(LEFT(DATENAME( MONTH,RH.DOCDATE),3)+'-'+Cast(Year(RH.DOCDATE) as varchar(4))) As PERIODNAME,
+IV.CODE As COLOUR_CODE,
+IM.CODE As MODELCODE,
+Cast(0 as int) as FK_MODEL,
+100021 As FLAG,
+Cast(0 as int) as IsSaleReturn,
+RH.TEHSIL3W AS TEHSILID,
+NULL AS SALESPERSON,
+NULL as LeadType,
+NULL AS BOOKINGDATE,
+NULL AS RETAILDATE
+FROM
+   RETAIL_HEADER RH JOIN COMPANY_MASTER CM ON (RH.COMPANYID=CM.COMPANYID AND CM.COMPANYTYPE = 2  )
+   --AND CM.COMPANYSUBTYPE='Triumph' )
+   LEFT JOIN CONTACT_MASTER CN ON (RH.SALESPERSONID = CN.CONTACTID AND CN.ID = (SELECT MAX(CN1.ID) FROM CONTACT_MASTER CN1 WHERE CN.CONTACTID = CN1.CONTACTID))
+   JOIN RETAIL_LINE RL ON (RH.HEADERID=RL.DOCID)
+   JOIN ITEM_MASTER IM ON (IM.ItemId=RL.ItemID)
+    INNER JOIN (select *, Row_number() over (partition by MODELCODE order by MODELCODE) as rnk
+	from ASM_PB_HKT_PRODUCT_DIM) PM  
+	ON  PM.Modelcode = IM.Code and PM.BRAND in('TRIUMPH') and rnk = 1
+ --testing>
+   LEFT JOIN ITEMVARMATRIX_MASTER IV ON (RL.VARMATRIXID=IV.ITEMVARMATRIXID)
+   LEFT JOIN SAP_ZDEALER_TARGET ON (CM.CODE=SAP_ZDEALER_TARGET.DEALER_CODE and MONTH(RH.DOCDATE)=SAP_ZDEALER_TARGET.ZMONTH and YEAR(RH.DOCDATE)=SAP_ZDEALER_TARGET.ZYEAR)
+WHERE 
+	--CAST(RH.DOCDATE AS DATE) BETWEEN '2025-06-09' AND Cast(Getdate()-1 as date)  AND
+	RH.DOCTYPE=1000079 /* IN(141,1000079,1000317,1012739,441) */
+	AND CAST(RH.IMPORTEDDATE as date)>=@ASMFact_IMPORTEDDATE
+GROUP BY
+   CM.CODE,
+   IM.CODE+IV.CODE,
+   CAST(RH.DOCDATE as Date),  
+   RL.LINEID,
+   RL.DOCID,
+   CM.COMPANYTYPE,
+   RH.BRANCHID,
+   RH.IMPORTEDDATE,  
+   RH.CDMS_BATCHNO,
+   (LEFT(DATENAME( MONTH,RH.DOCDATE),3)+'-'+Cast(Year(RH.DOCDATE) as varchar(4))),
+   IV.CODE,
+   IM.CODE,
+   RH.TEHSIL3W,
+   TRIM(UPPER(CN.NAME));
+   
+DELETE FROM ASM_PB_T_RETAIL_STG WHERE DATE>Cast(Getdate()-1 as date)
+  
+--Return Logic:
+SELECT RL.SALEINVOICELINEID,RL.SERIALNO INTO #ReturnData_MC 
+FROM 
+RETAIL_LINE_RETURN RL INNER JOIN ASM_PB_T_RETAIL_STG RD ON RD.RETAILLINEID=RL.SALEINVOICELINEID
+
+--Return Data Flag Updation
+UPDATE RD
+SET RD.IsSaleReturn=1
+FROM ASM_PB_T_RETAIL_STG RD INNER JOIN #ReturnData_MC RL ON RL.SALEINVOICELINEID=RD.RETAILLINEID
+
+--Dedup Process:
+   ;WITH CTE AS                  
+ (                  
+  SELECT *,                  
+   ROW_NUMBER()OVER(PARTITION BY FK_RETAILDOCID,RETAILLINEID ORDER BY IMPORTEDDATE DESC)RNK                   
+  FROM ASM_PB_T_RETAIL_STG                  
+ )
+DELETE FROM CTE                  
+ WHERE RNK<>1;
+ 
+-- Product Master and Dealer Master FK update: ASM_PB_T_RETAIL_STG
+update B set B.FK_SKU=C.PK_SKU from ASM_PB_T_RETAIL_STG B INNER JOIN ASM_PB_HKT_PRODUCT_SKU_DIM C on (B.SKU=C.SKU_CODE) 
+update B set B.FK_MODEL=C.PK_Model_Code from ASM_PB_T_RETAIL_STG B INNER JOIN ASM_PB_HKT_PRODUCT_DIM C on (B.MODELCODE=C.MODELCODE)
+update B set B.FK_DEALERCODE=C.PK_DEALERCODE from[dbo].ASM_PB_T_RETAIL_STG B INNER JOIN ASM_PB_HKT_DEALER_MASTER_DIM C on (B.DEALERCODE=C.DEALERCODE)
+--********************************************************************************************
+--3.Retail Target
+--Note: The table is yet to come from business, don't refer this.
+
+TRUNCATE TABLE ASM_PB_T_RETAIL_TARGET
+
+INSERT INTO ASM_PB_T_RETAIL_TARGET
+SELECT Distinct 
+SAP_ZSD_SKU_PLAN.DEALER
+,SAP_ZSD_SKU_PLAN.SKU
+,Cast('' as int) as FK_DEALERCODE
+,Cast('' as int) as FK_SKU
+,10002 As FK_TYPE_ID
+,Cast(convert(datetime, replace((LEFT(SAP_ZSD_SKU_PLAN.CMONTH,3)+' '+CAST(SAP_ZSD_SKU_PLAN.CYEAR AS VARCHAR(4))), '-', ' ')) as date) As DATE
+,Cast(null as decimal(19,0)) As RETAILLINEID
+,Cast(null as decimal(19,0)) As FK_RETAILDOCID
+,Cast(null as decimal(19,0)) As COMPANYTYPE
+,Cast(null as decimal(19,0)) As BRANCHID
+,Cast(null as decimal(10,0)) As ACTUALQUANTITY
+,Round(Sum(RET_SKU_QUANTITY),0) As TARGETQUANTITY
+,getdate() as LASTUPDATEDDATETIME
+,Cast(null as DATE) As IMPORTEDDATE
+,Cast(0 as decimal(19,0)) As CDMS_BATCHNO
+,(CAST(SAP_ZSD_SKU_PLAN.CMONTH as char(4))+''+CAST(SAP_ZSD_SKU_PLAN.CYEAR as char(4))) AS PERIODNAME
+,RIGHT(SAP_ZSD_SKU_PLAN.SKU,2) As COLOUR_CODE
+,LEFT(SAP_ZSD_SKU_PLAN.SKU,6) AS MODELCODE
+,Cast('' as int) As FK_MODEL
+,100022 As FLAG
+,NULL AS TEHSILID
+,NULL AS SALESPERSON
+,NULL as LeadType
+,CAST(NULL AS DATE) BOOKINGDATE
+,CAST(NULL AS DATE) TESTRIDEDATE
+--INTO ASM_PB_T_RETAIL_TARGET
+FROM
+SAP_ZSD_SKU_PLAN    
+INNER JOIN(select *, Row_number() over (partition by MODELCODE order by MODELCODE) as rnk
+	from ASM_PB_HKT_PRODUCT_DIM) PM  
+	ON  PM.Modelcode = LEFT(SAP_ZSD_SKU_PLAN.SKU,6) and PM.BRAND in('TRIUMPH') and rnk = 1
+GROUP BY
+SAP_ZSD_SKU_PLAN.DEALER,
+SAP_ZSD_SKU_PLAN.SKU,                                           
+Cast(convert(datetime, replace((LEFT(SAP_ZSD_SKU_PLAN.CMONTH,3)+' '+CAST(SAP_ZSD_SKU_PLAN.CYEAR AS VARCHAR(4))), '-', ' ')) as date),
+DATALOADTIME,
+(CAST(SAP_ZSD_SKU_PLAN.CMONTH as char(4))+''+CAST(SAP_ZSD_SKU_PLAN.CYEAR as char(4))),
+RIGHT(SAP_ZSD_SKU_PLAN.SKU,2),
+LEFT(SAP_ZSD_SKU_PLAN.SKU,6)
+
+-- Product Master and Dealer Master FK update: ASM_PB_T_RETAIL_TARGET
+
+-- Step 4:
+update B set B.FK_SKU=C.PK_SKU from ASM_PB_T_RETAIL_TARGET B INNER JOIN ASM_PB_HKT_PRODUCT_SKU_DIM C on (B.SKU=C.SKU_CODE)
+update B set B.FK_MODEL=C.PK_Model_Code from ASM_PB_T_RETAIL_TARGET B INNER JOIN ASM_PB_HKT_PRODUCT_DIM C on (B.MODELCODE=C.MODELCODE)
+update B set B.FK_DEALERCODE=C.PK_DEALERCODE from ASM_PB_T_RETAIL_TARGET B INNER JOIN ASM_PB_HKT_DEALER_MASTER_DIM C on (B.DEALERCODE=C.DEALERCODE)
+
+
+
+--****************************************************************************
+--4.Retail Fact
+TRUNCATE TABLE ASM_PB_T_RETAIL_FACT
+
+INSERT INTO ASM_PB_T_RETAIL_FACT
+SELECT
+Distinct
+DEALERCODE
+,SKU
+,FK_DEALERCODE
+,FK_SKU
+,FK_TYPE_ID
+,DATE
+,RETAILLINEID
+,FK_RETAILDOCID
+,COMPANYTYPE
+,BRANCHID
+,ACTUALQUANTITY
+,TARGETQUANTITY
+,LASTUPDATEDDATETIME
+,IMPORTEDDATE
+,CDMS_BATCHNO
+,PERIODNAME
+,COLOUR_CODE
+,MODELCODE
+,FK_MODEL
+,FLAG
+,TEHSILID
+,SALESPERSON
+,LeadType
+,BOOKINGDATE
+,TESTRIDEDATE
+,NULL AS First_Source_Lead_Type
+,NULL  As First_Mode_Source
+,NULL AS First_Mode_SubSource
+FROM ASM_PB_T_RETAIL_STG  
+Where IsSaleReturn<>1
+UNION
+SELECT *
+,NULL AS First_Source_Lead_Type
+,NULL  As First_Mode_Source
+,NULL AS First_Mode_SubSource from ASM_PB_T_RETAIL_TARGET
+
+/* Addition of Lead Type  Logic*/
+
+SELECT DISTINCT PK_RETAILHEADERID,
+COALESCE(EH1.LEADTYPE,EH2.LEADTYPE,LSQ_PBASE1.mx_Enquiry_Mode ,LSQ_PBASE2.mx_Enquiry_Mode) LEADTYPE,
+COALESCE (CAST(BL1.DOCDATE AS DATE),CAST(BL2.DOCDATE AS DATE)) AS BOOKINGDATE,
+COALESCE (LSQ_TESTRIDE1.TR1DATE,LSQ_TESTRIDE2.TR2DATE) AS TESTRIDEDATE,
+CASE WHEN coalesce(CAST(PEX1.MX_DEALER_ASSIGNMENT_DATE AS DATE),CAST(PEX2.MX_DEALER_ASSIGNMENT_DATE AS DATE))>='2024-12-01' THEN coalesce(EH1.LEADTYPE,EH2.LEADTYPE,PE1.mx_Qualified_First_Source ,PE2.mx_Qualified_First_Source) END AS First_Source_Lead_type,
+coalesce(LSQ_PBASE1.FirstName, LSQ_PBASE2.FirstName) AS SALESPERSON,
+coalesce(LSQ_PBASE1.OWNERID, LSQ_PBASE2.OWNERID) SALESPERSON_ID,
+ISNULL(COALESCE(PE1.mx_Qualified_Source_of_Enquiry,PE2.mx_Qualified_Source_of_Enquiry), 'Not Available')   AS First_Mode_Source,
+ISNULL(COALESCE(PE1.mx_Qualified_Sub_Source,PE2.mx_Qualified_Sub_Source), 'Not Available') AS First_Mode_SubSource
+INTO  #Triumph_LEADTYPE_RETAIL
+FROM 
+ASM_PB_T_RETAIL_DIM RETAIL_DIM
+INNER JOIN  RETAIL_HEADER RH ON (RH.HEADERID=RETAIL_DIM.PK_RETAILHEADERID)
+LEFT JOIN RETAIL_LINE RL1 ON (RH.HEADERID=RL1.DOCID)
+LEFT JOIN ALLOCATION_LINE AL ON (AL.LINEID=RL1.ALLOCATIONDATALINEID)
+LEFT JOIN BOOKING_LINE BL1 ON  (BL1.LINEID=AL.BOOKINGDATALINEID)
+LEFT JOIN RETAIL_LINE RL2 ON RL2.DOCID = RH.HEADERID
+LEFT JOIN BOOKING_LINE BL2 ON RL2.BOOKINGDATALINEID = BL2.LINEID
+LEFT JOIN ENQUIRY_LINE EL1 ON EL1.LINEID = BL1.ENQUIRYDATALINEID
+LEFT JOIN ENQUIRY_LINE EL2 ON EL2.LINEID = BL2.ENQUIRYDATALINEID
+LEFT JOIN ENQUIRY_HEADER EH1 ON EH1.HEADERID = EL1.DOCID
+LEFT JOIN ENQUIRY_HEADER EH2 ON EH2.HEADERID = EL2.DOCID
+LEFT JOIN BOOKING_HEADER_EXT BHE1 ON (BL1.HEADERID = BHE1.HEADERID)
+LEFT JOIN BOOKING_HEADER_EXT BHE2 ON (BL2.HEADERID = BHE2.HEADERID)
+LEFT JOIN LSQ_ProspectActivity_ExtensionBase PAE1 ON (Cast(PAE1.RelatedProspectId+','+PAE1.ProspectActivityExtensionId as varchar(8000))=BHE1.LMSBOOKINGID) and PAE1.ActivityEvent=12002 and PAE1.mx_Custom_48 IS NULL
+LEFT JOIN LSQ_Prospect_Base LSQ_PBASE1 ON (LSQ_PBASE1.ProspectID=PAE1.RelatedProspectId)
+LEFT JOIN LSQ_ProspectActivity_ExtensionBase PAE2 ON (Cast(PAE2.RelatedProspectId+','+PAE2.ProspectActivityExtensionId as varchar(8000))=BHE2.LMSBOOKINGID) and PAE2.ActivityEvent=12002 and PAE2.mx_Custom_48 IS NULL
+LEFT JOIN LSQ_Prospect_Base LSQ_PBASE2 ON (LSQ_PBASE2.ProspectID=PAE2.RelatedProspectId)
+
+LEFT JOIN LSQ_Prospect_ExtensionBase PEX1 ON (LSQ_PBASE1.ProspectId=PEX1.ProspectId)
+LEFT JOIN LSQ_Prospect_ExtensionBase PEX2 ON (LSQ_PBASE2.ProspectId=PEX2.ProspectId)
+
+LEFT JOIN LSQ_Prospect_Extension2Base PE1 ON (LSQ_PBASE1.ProspectId=PE1.ProspectId)
+LEFT JOIN LSQ_Prospect_Extension2Base PE2 ON (LSQ_PBASE2.ProspectId=PE2.ProspectId)
+
+LEFT JOIN (select RelatedProspectID,CAST(createdon AS DATE) TR1DATE, ROW_NUMBER() OVER (PARTITION BY RelatedProspectID ORDER BY createdon asc) AS RANK1
+from 
+LSQ_ProspectActivity_ExtensionBase 
+where ActivityEvent =202 and STATUS='Completed'
+)LSQ_TESTRIDE1
+ON LSQ_TESTRIDE1.RelatedProspectID=LSQ_PBASE1.ProspectId
+AND LSQ_TESTRIDE1.RANK1=1
+LEFT JOIN (select RelatedProspectID,CAST(createdon AS DATE) TR2DATE, ROW_NUMBER() OVER (PARTITION BY RelatedProspectID ORDER BY createdon asc) AS RANK1
+from 
+LSQ_ProspectActivity_ExtensionBase 
+where ActivityEvent =202 and STATUS='Completed'
+)LSQ_TESTRIDE2
+ON LSQ_TESTRIDE2.RelatedProspectID=LSQ_PBASE2.ProspectId
+AND LSQ_TESTRIDE2.RANK1=1
+WHERE RH.DOCTYPE IN(141,1000079,1000317,1012739,441) 
+
+UPDATE RF 
+SET RF.LEADTYPE = LD.LEADTYPE
+, RF.BOOKINGDATE = LD.BOOKINGDATE
+, RF.TESTRIDEDATE = LD.TESTRIDEDATE 
+, RF.First_Source_Lead_type=LD.First_Source_Lead_type
+, RF.SALESPERSON =  REPLACE(REPLACE(REPLACE(REPLACE(UPPER(LSQ_User.Firstname),CHAR(160),''),' ',' |'),'| ',''),' |',' ') 
+, RF.First_Mode_Source=LD.First_Mode_Source
+, RF.First_Mode_SubSource=LD.First_Mode_SubSource
+FROM ASM_PB_T_RETAIL_FACT RF
+INNER JOIN #Triumph_LEADTYPE_RETAIL LD ON RF.FK_RETAILDOCID=LD.PK_RETAILHEADERID
+LEFT JOIN LSQ_users LSQ_User  on LD.SALESPERSON_ID=LSQ_User.UserId
+
+ END TRY
+    BEGIN CATCH
+        SET @Status2 = 'FAILURE';
+        SET @ErrorMessage2 = ERROR_MESSAGE();
+        THROW;  
+    END CATCH
+    SET @EndDate_utc2 = GETDATE();
+	SET @EndDate_ist2 = (DATEADD(mi,30,(DATEADD(hh,5,getdate()))));
+    SET @Duration_sec2 = DATEDIFF(SECOND, @StartDate_ist2, @EndDate_ist2);
+	SET @Duration2 = CONVERT(VARCHAR(8), DATEADD(SECOND, @Duration_sec2, 0), 108);
+    EXEC [USP_Audit_Balance_Control_Logs] 
+	     @SPID,
+        @sp_name,
+		@table_name2,
+        'Sales',
+        'PB-TRM',
+        @StartDate_utc2,
+        @EndDate_utc2,
+		@StartDate_ist2,
+        @EndDate_ist2,
+        @Duration2,  
+        0,
+        0,
+        @Status2,
+        @ErrorMessage2;
+
+
+END
+GO

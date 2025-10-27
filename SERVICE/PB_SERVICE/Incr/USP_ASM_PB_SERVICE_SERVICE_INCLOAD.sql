@@ -19,7 +19,7 @@ ALTER PROC [dbo].[USP_ASM_PB_SERVICE_SERVICE_INCLOAD] AS
 /*	2024-01-07 	|	Ashwini Ahire   		| Parts Failure Screen first deployment  
     2025-04-01 	|	Richa Mishra  		| TAT columns addition  */
 /*	2025-04-10 	|	Dewang Makani		    | Addition of new columns for PB reports */
-/*  2025-10-13  | Rashi Pradhan   | Updated other to Null for PartRepairType for part failure prod issue fix and added audit log */
+/*  2025-10-13  | Rashi Pradhan   | Updated other to Null for PartRepairType for part failure prod issue fix and added audit log  */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/

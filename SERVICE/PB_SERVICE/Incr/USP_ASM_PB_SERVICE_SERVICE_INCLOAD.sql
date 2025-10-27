@@ -19,7 +19,9 @@ ALTER PROC [dbo].[USP_ASM_PB_SERVICE_SERVICE_INCLOAD] AS
 /*	2024-01-07 	|	Ashwini Ahire   		| Parts Failure Screen first deployment  
     2025-04-01 	|	Richa Mishra  		| TAT columns addition  */
 /*	2025-04-10 	|	Dewang Makani		    | Addition of new columns for PB reports */
-/*  2025-10-13  | Rashi Pradhan   | Updated other to Null for PartRepairType for part failure prod issue fix and added audit log  */
+/*	2025-07-01 	|	Dewang Makani		| Updated SDD due and done logic */
+/*  2025-07-25  |   Rashi Pradhan       | Addition of assure AMC labour code to paid flag logic */
+/*  2025-10-13  | Rashi Pradhan   | Updated other to Null for PartRepairType for part failure prod issue fix and added audit log */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -164,7 +166,8 @@ FROM
  ,CASE WHEN IM.CODE IN ('KTMSL0001','KTMSL0002','KTMSL0003','KTMSL0004','KTMSL0005','HSQSL0001 ','HSQSL0002','HSQSL0003','HSQSL0004','HSQSL0005','TRISL0263') THEN 1
       WHEN SL.ITEMID IN (1177061,1177062,1177063,1177064,1177065,1177066,1177067,1177068,1177069,1177070,1177071,1177072,1177073,1177074,1177075,1177076,1177077,1177078,1177079,1177082) THEN 1 -- BigBike Paid Service labor ids
       WHEN SL.ITEMID IN (83010498,489345,50233,1208163,1107952,1178989) THEN 1  -- KTM & TRM OIL itemids
-       ELSE 0 END AS 'PaidFlag'              
+      WHEN SL.ITEMID IN (1226151,1226150,1226149) THEN 1 ---Assure AMC Labour Codes (CR)
+       ELSE 0 END AS 'PaidFlag'                            
  ,SCM1.NAME AS ServiceType
  ,CM.CODE AS DealerCode
  ,SH.Importeddate
@@ -192,8 +195,16 @@ END AS JobCardStatus
 ,SH.PDINOWOK AS PDINOWOK
 ,SLE.CUSTOMERVOICECODEWARRANTY AS CUSTOMERVOICECODEWARRANTY
 ,SLE.CUSTOMERVOICENAMEWARRANTY AS CUSTOMERVOICENAMEWARRANTY
-,CASE WHEN DATEPART(HOUR, SH.DOCDATE) >= 0 AND DATEPART(HOUR, SH.DOCDATE) <= 16 AND SH.CONTRACTTYPEID NOT IN (8,168,43) THEN 1 ELSE 0 END AS 'SDD_DUE'
-,CASE WHEN DATEPART(HOUR, SH.DOCDATE) >= 0 AND DATEPART(HOUR, SH.DOCDATE) <= 16 AND CAST(SH.Billeddatetime AS DATE)=CAST(SH.DOCDATE AS DATE) AND SH.CONTRACTTYPEID NOT IN (8,168,43) THEN 1 ELSE 0 END AS 'SDD_BILL'
+,CASE 
+	WHEN ((datepart(hour, sh.docdate)>= 0 and datepart(hour,sh.docdate)<16) OR (cast(sh.docdate as date) = cast(sh.billeddatetime as date))) and SH.CONTRACTTYPEID NOT IN (8,168,43)
+	THEN 1
+	ELSE 0
+END AS 'SDD_DUE'
+,CASE 
+      WHEN cast(sh.docdate as date) = cast(sh.billeddatetime as date) AND SH.CONTRACTTYPEID NOT IN (8,168,43)
+      THEN 1 
+      ELSE 0 
+END AS 'SDD_BILL'
 ,CASE WHEN DATEPART(HOUR, SH.DOCDATE) >= 0 AND DATEPART(HOUR, SH.DOCDATE) <= 16 AND CAST(SH.READYFORBILLDATETIME AS DATE)=CAST(SH.DOCDATE AS DATE) AND SH.CONTRACTTYPEID NOT IN (8,168,43) THEN 1 ELSE 0 END AS 'SDD_READY'
 ,SH.CustomerVoiceDetails AS CustomerVoiceDetails
 ,SLE.CAUSALFLAG AS CausalFlag
@@ -311,6 +322,7 @@ FROM
  ,CASE WHEN IM.CODE IN ('KTMSL0001','KTMSL0002','KTMSL0003','KTMSL0004','KTMSL0005','HSQSL0001 ','HSQSL0002','HSQSL0003','HSQSL0004','HSQSL0005','TRISL0263') THEN 1
       WHEN SL.ITEMID IN (1177061,1177062,1177063,1177064,1177065,1177066,1177067,1177068,1177069,1177070,1177071,1177072,1177073,1177074,1177075,1177076,1177077,1177078,1177079,1177082) THEN 1  -- BigBike Paid Service labor ids
       WHEN SL.ITEMID IN (83010498,489345,50233,1208163,1107952,1178989) THEN 1  -- KTM & TRM OIL itemids
+      WHEN SL.ITEMID IN (1226151,1226150,1226149) THEN 1 ---Assure AMC Labour Codes (CR)
        ELSE 0 END AS 'PaidFlag'             
  ,SCM1.NAME AS ServiceType
  ,CM.CODE AS DealerCode
@@ -339,8 +351,16 @@ END AS JobCardStatus
 ,SH.PDINOWOK AS PDINOWOK
 ,SLE.CUSTOMERVOICECODEWARRANTY AS CUSTOMERVOICECODEWARRANTY
 ,SLE.CUSTOMERVOICENAMEWARRANTY AS CUSTOMERVOICENAMEWARRANTY
-,CASE WHEN DATEPART(HOUR, SH.DOCDATE) >= 0 AND DATEPART(HOUR, SH.DOCDATE) <= 16 AND SH.CONTRACTTYPEID NOT IN (8,168,43) THEN 1 ELSE 0 END AS 'SDD_DUE'
-,CASE WHEN DATEPART(HOUR, SH.DOCDATE) >= 0 AND DATEPART(HOUR, SH.DOCDATE) <= 16 AND CAST(SH.Billeddatetime AS DATE)=CAST(SH.DOCDATE AS DATE) AND SH.CONTRACTTYPEID NOT IN (8,168,43) THEN 1 ELSE 0 END AS 'SDD_BILL'
+,CASE 
+	WHEN ((datepart(hour, sh.docdate)>= 0 and datepart(hour,sh.docdate)<16) OR (cast(sh.docdate as date) = cast(sh.billeddatetime as date))) and SH.CONTRACTTYPEID NOT IN (8,168,43)
+	THEN 1
+	ELSE 0
+END AS 'SDD_DUE'
+,CASE 
+      WHEN cast(sh.docdate as date) = cast(sh.billeddatetime as date) AND SH.CONTRACTTYPEID NOT IN (8,168,43)
+      THEN 1 
+      ELSE 0 
+END AS 'SDD_BILL'
 ,CASE WHEN DATEPART(HOUR, SH.DOCDATE) >= 0 AND DATEPART(HOUR, SH.DOCDATE) <= 16 AND CAST(SH.READYFORBILLDATETIME AS DATE)=CAST(SH.DOCDATE AS DATE) AND SH.CONTRACTTYPEID NOT IN (8,168,43) THEN 1 ELSE 0 END AS 'SDD_READY'
 ,SH.CustomerVoiceDetails AS CustomerVoiceDetails
 ,SLE.CAUSALFLAG AS CausalFlag

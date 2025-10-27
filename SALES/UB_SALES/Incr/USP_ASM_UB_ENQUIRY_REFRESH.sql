@@ -21,7 +21,7 @@ BEGIN
 /*  2025-06-18	|	Lachmanna		 | SameDay booking,Retail and Enquiry     */
 /*  2025-09-05	|	Ashwini		 | UB duedate Followup logic  update    */
 /*  2025-10-08	|	Ashwini		 | UB duedate Followup logic  with CRE UPDATE    */
-/*  2025-10-13	|	Lachmanna		 | Added lost enquiry     */
+/*  2025-10-13	|	Lachmanna		 | Added lost enquiry CR     */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -128,16 +128,17 @@ CAST(DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date)))AS DATE)= CAS
 ,CASE WHEN  UPPER(UB.ProspectStage) IN ('LOST' ,'AUTO - CLOSED' ,'CLOSED' ,'LOST TO COMPETITION' ,'LOST TO CO-DEALER') and 
 CAST(DATEADD(mi,30,(DATEADD(hh,5,EXTUB.mx_Dealer_Assignment_Date)))AS DATE)= CAST(DATEADD(mi,30,(DATEADD(hh,5,ACTEXT.mx_Custom_27)))AS DATE)  then 'YES' ELSE 'NO' end as SameDayClosed
 
-/*lachmanna DEV columns not in PROD yet*/
+/*-lachmanna DEV columns not in PROD yet
 ,EXTUB.mx_Lost_to_Competition_Make	as COMPETITION_BRAND
 ,EXTUB.mx_Competition_Model as 	COMPETITION_MODEL
 ,EXTUB.mx_Reason_for_Choosing_Competition as 	REASON_FOR_CHOOSING_COMPETITION
 ,EXTUB.mx_Follow_Up_Dispositions as 	Follow_Up_Dispositions
-,CASE WHEN UPPER(UB.ProspectStage) IN ('BOOKED') THEN 'Booked'
-	WHEN UPPER(UB.ProspectStage) IN ('INVOICED') THEN 'Invoiced'
-	WHEN UPPER(UB.ProspectStage) IN ('LOST' ,'AUTO - CLOSED','AUTO-CLOSED' ,'AUTO- CLOSED','CLOSED' ,'LOST TO COMPETITION' ,'LOST TO CO-DEALER','LOST TO CO-DEALER/CO- BRANCH','FUTURE RETARGETING') THEN 'Closed' 
-	WHEN UPPER(UB.ProspectStage) IN ('OPEN', 'CONTACTED', 'QUALIFIED', 'TEST RIDE BOOKED', 'TEST RIDE CANCELLED', 'TEST RIDE RESCHEDULED', 'VISITED', 'SALES DEMO', 'TEST RIDE COMPLETED', 'FINANCE', 'EXCHANGE', 'BOOKING IN PROGRESS ','BOOKING INPROGRESS', 'BOOKING FAILED','Intent to Book') THEN 'Open' END AS EnquiryStatus
+,UB.ProspectStage as 	ENQUIRY_STAGE
 ,ACTEXT.mx_Custom_2 as OPPORTUNITY_STATUS
+,DATEADD(mi,30,(DATEADD(hh,5,LSQ_UTBASE.DueDate))) as Duedate
+,CM.CODE as DEALERCODE*/
+
+
 FROM LSQ_UB_PROSPECT_BASE UB
 
 JOIN BRANCH_MASTER BM  WITH (NOLOCK)
@@ -495,7 +496,7 @@ drop table #Sessiontime
         0,
         0,
         @Status2,
-        @ErrorMessage2;
+        @ErrorMessage2; 
 
 END
 

@@ -21,7 +21,7 @@ ALTER PROC [dbo].[USP_ASM_PB_SERVICE_SERVICE_INCLOAD] AS
 /*	2025-04-10 	|	Dewang Makani		    | Addition of new columns for PB reports */
 /*	2025-07-01 	|	Dewang Makani		| Updated SDD due and done logic */
 /*  2025-07-25  |   Rashi Pradhan       | Addition of assure AMC labour code to paid flag logic */
-/*  2025-10-13  | Rashi Pradhan   | Updated other to Null for PartRepairType for part failure prod issue fix and added audit log */
+/*  2025-10-13  | Rashi Pradhan  Rashi | Updated other to Null for PartRepairType for part failure prod issue fix and added audit log */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/

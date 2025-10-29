@@ -2,9 +2,18 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-
-CREATE PROC [dbo].[TradeIn_ExchangeAppLoad_SP] AS
+/********************************************HISTORY**************************************************/
+/*--------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------*/
+/*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION					*/
+/*--------------------------------------------------------------------------------------------------*/
+/*  2025-10-27 	|	Ashwini		        | Dealer code and Branch code column logic change        */
+/*--------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------*/
+/*******************************************HISTORY**************************************************/
+ALTER PROC [dbo].[TradeIn_ExchangeAppLoad_SP] AS
 --------------------------Vehicles-----------------------
+
 Truncate table TradeIn_Vehicles
 insert into TradeIn_Vehicles(
 [Pk_vehicle_id]
@@ -59,15 +68,14 @@ select v.id
       ,v.[lowest_bid_selection_comments]
       ,v.[bid_opened_at]
       ,v.[dealer_id]
-	  ,case when d.code like '[0-9][0-9][0-9][0-9][0-9]' then concat('00000',d.CODE) else d.code end as dealer_code 
+	  ,case when u.dealer_code like '[0-9][0-9][0-9][0-9][0-9]' then concat('00000',u.dealer_code) else u.dealer_code end as dealer_code 
 	  ,case when u.branch_code like '[0-9][0-9][0-9][0-9][0-9]' then concat('00000',u.branch_code) else u.branch_code end as branch_code
         ,v.bu
 	  ,getdate()
 	  from [dbo].[TRADEAPP_VEHICLES] v
-	  left join [dbo].[TRADEAPP_DEALERS] d on d.id=v.dealer_id
+	  --left join [dbo].[TRADEAPP_DEALERS] d on d.id=v.dealer_id
 	  left join [dbo].[TRADEAPP_USERS] u on v.created_by=u.id
 	  where year(cast(isnull(v.ownership_transfer_date,'') as date)) !='1970'
-
 
 ----------------------------Users--------------------------------------
 Truncate table TradeIn_Users_Dim
@@ -134,6 +142,30 @@ select v.pk_vehicle_id
 
 -----------------------------Vehicle_Bids----------------------------
 --Upsert Logic(Update)
+
+
+DECLARE @SPID INT = @@SPID,
+        @sp_name VARCHAR(128) = 'TradeIn_ExchangeAppLoad_SP';
+
+----------------------------------------------------------------
+    -- Audit Segment 1: TradeIn_Vehicle_Bids_Fact
+----------------------------------------------------------------  
+
+DECLARE @StartDate_utc1 DATETIME = GETDATE(),
+            @EndDate_utc1 DATETIME,
+			@StartDate_ist1 DATETIME = (DATEADD(mi,30,(DATEADD(hh,5,getdate())))),
+            @EndDate_ist1 DATETIME,
+            @Duration_sec1 bigint,
+			@Duration1 varchar(15),
+			@table_name1 VARCHAR(128) = 'TradeIn_Vehicle_Bids_Fact', 
+            @SourceCount1 BIGINT,  
+            @TargetCount1 BIGINT,   
+            @Status1 VARCHAR(10),
+            @ErrorMessage1 VARCHAR(MAX);  
+BEGIN TRY
+
+
+
 Update B Set 
  B.[Pk_bid_id]=A.[id]
 ,B.[Fk_vehicle_id]=A.vehicle_id
@@ -209,5 +241,34 @@ left join
 ,ROW_NUMBER() over(partition by vehicle_id order by amount desc) rno
 from TRADEAPP_VEHICLE_BIDS) highest_amount on block1.vehicle_id=highest_amount.vehicle_id and rno=1)a
 join TradeIn_Vehicle_Bids_Fact v on v.fk_vehicle_id=a.vehicle_id and v.amount=a.amount
+
+
+----------------------------------Audit Log Target
+
+    END TRY
+    BEGIN CATCH
+        SET @Status1 = 'FAILURE';
+        SET @ErrorMessage1 = ERROR_MESSAGE();
+        THROW;  
+    END CATCH
+    SET @EndDate_utc1 = GETDATE();
+	SET @EndDate_ist1 = (DATEADD(mi,30,(DATEADD(hh,5,getdate()))));
+    SET @Duration_sec1 = DATEDIFF(SECOND, @StartDate_ist1, @EndDate_ist1);
+	SET @Duration1 = CONVERT(VARCHAR(8), DATEADD(SECOND, @Duration_sec1, 0), 108);
+    EXEC [USP_Audit_Balance_Control_Logs] 
+	     @SPID,
+        @sp_name,
+		@table_name1,
+        'Sales',
+        'UB',
+        @StartDate_utc1,
+        @EndDate_utc1,
+		@StartDate_ist1,
+        @EndDate_ist1,
+        @Duration1,  
+        0,
+        0,
+        @Status1,
+        @ErrorMessage1;
 
 GO

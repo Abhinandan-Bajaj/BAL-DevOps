@@ -12,6 +12,7 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------*/
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
 /*  2025-09-25 	|	Lachmanna		        | Newly Added No of Followup  and   Followup Bucket CR      */
+/*  2025-10-28 	|	Lachmanna		        |  Followup Bucket Bug and CRE logic CR      */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -39,12 +40,13 @@ WITH
 (
   	DISTRIBUTION = HASH(RelatedEntityId),
 	CLUSTERED COLUMNSTORE INDEX
-);INSERT INTO #LSQ_UTBASE
+);
+DECLARE @UTThreshold DATE = DATEADD(DAY, -30, GETDATE());
+INSERT INTO #LSQ_UTBASE
 SELECT   OwnerId,DueDate,RelatedEntityId, TaskType,CreatedON --Into #LSQ_UTBASE                 
-FROM LSQ_UserTask_Base  WHERE TaskType in(
+FROM LSQ_UserTask_Base U  WHERE TaskType in(
 select CODE from DM_CodeInclusionExclusion_Master where TypeFlag='Tasktype_001' and IncORExc='Include')
-and Try_Cast(CreatedON as DATE)>= ( select  ISNULL(DATEADD(DAY, -2, MAX(EnquiryDate)), '2022-01-01')  from ASM_PB_T_ENQUIRY_DIM)
-
+and Try_Cast(CreatedON as DATE)>= ( select  ISNULL(DATEADD(DAY, -30, MAX(IMPORTEDDATE)), '2022-01-01')  from ASM_PB_T_ENQUIRY_DIM)
 
 --*/ 
  --Truncate table ASM_PB_T_ENQUIRY_DIM
@@ -105,9 +107,9 @@ SELECT DISTINCT
 				--AND (CONVERT(TIME, DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))) NOT BETWEEN '08:00:00' AND '17:00:00')
 				THEN */
 			CASE 
-				WHEN CAST(DATEDIFF(MINUTE, COALESCE(LSQ_UTBASE.DueDate,LSQ_PEXTBASE.mx_Dealer_Assignment_Date ), FIRST_FOLLOWUP.FirstFollowupDate) AS INT) <= 120 THEN '<3 Hrs'
-				WHEN CAST(DATEDIFF(MINUTE, COALESCE(LSQ_UTBASE.DueDate,LSQ_PEXTBASE.mx_Dealer_Assignment_Date ), FIRST_FOLLOWUP.FirstFollowupDate) AS INT) BETWEEN 121 AND 1380 THEN '3-24 Hrs'
-				WHEN CAST(DATEDIFF(MINUTE, COALESCE(LSQ_UTBASE.DueDate,LSQ_PEXTBASE.mx_Dealer_Assignment_Date ), FIRST_FOLLOWUP.FirstFollowupDate) AS INT) > 1380 THEN '>24 Hrs' --  END
+				WHEN CAST(DATEDIFF(MINUTE, LSQ_UTBASE.DueDate, COALESCE( CRE_FIRST_FOLLOWUP.CREfollowupDate , FIRST_FOLLOWUP.FirstFollowupDate)) AS INT) <= 120 THEN '<3 Hrs'
+				WHEN CAST(DATEDIFF(MINUTE, LSQ_UTBASE.DueDate, COALESCE( CRE_FIRST_FOLLOWUP.CREfollowupDate , FIRST_FOLLOWUP.FirstFollowupDate)) AS INT) BETWEEN 121 AND 1380 THEN '3-24 Hrs'
+				WHEN CAST(DATEDIFF(MINUTE, LSQ_UTBASE.DueDate, COALESCE( CRE_FIRST_FOLLOWUP.CREfollowupDate , FIRST_FOLLOWUP.FirstFollowupDate)) AS INT) > 1380 THEN '>24 Hrs' --  END
 			/*ELSE --WHEN LSQ_PEB.mx_Non_Working_Hour IS NULL THEN 
 			CASE 
 				WHEN CAST(DATEDIFF(MINUTE, LSQ_PEXTBASE.mx_Dealer_Assignment_Date, FIRST_FOLLOWUP.FirstFollowupDate) AS INT)< 180 THEN '<3 Hrs'
@@ -165,8 +167,7 @@ FROM
    INNER JOIN (select *, Row_number() over (partition by MODELCODE order by MODELCODE) as rnk
 	from ASM_PB_HKT_PRODUCT_DIM) PM  
 	ON  PM.Modelcode = IM.Code and PM.BRAND in('TRIUMPH') and rnk = 1
-  
-      LEFT JOIN (select DueDate,OwnerId,RelatedEntityId,TaskType,CreatedON  from
+ LEFT JOIN (select DueDate,OwnerId,RelatedEntityId,TaskType,CreatedON  from
  (SELECT DueDate,OwnerId,RelatedEntityId, TaskType,CreatedON, ROW_NUMBER()OVER(PARTITION BY RelatedEntityId ORDER BY CreatedON Asc)RNK                  
   FROM #LSQ_UTBASE  ) UT
   WHERE RNK = 1  ) LSQ_UTBASE
@@ -185,6 +186,18 @@ and mx_Custom_13 is not null ) A where RNK=1
 ) FIRST_FOLLOWUP
 ON FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND FIRST_FOLLOWUP.FirstFollowupDate>LSQ_PEXTBASE.mx_dealer_assignment_Date
+
+--------------- CRE FOLLOWUP----------------
+LEFT JOIN (SELECT RelatedProspectID,CREfollowupDate, FirstIsCustomerContacted,CREFollowupScheduleDate,mx_custom_14,mx_custom_15 FROM (
+select RelatedProspectID,mx_Custom_13 as FirstIsCustomerContacted,mx_custom_3 as CREFollowupScheduleDate,
+createdon as CREfollowupDate, mx_custom_14 , mx_custom_15,
+ROW_NUMBER()OVER(PARTITION BY RelatedProspectID ORDER BY CREATEDON ASC) AS RNK 
+from LSQ_PROSPECTACTIVITY_EXTENSIONBASE  
+where ActivityEvent=237
+) A where RNK=1
+) CRE_FIRST_FOLLOWUP
+ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
+AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
 
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate FROM (
@@ -225,7 +238,6 @@ AND LATEST_FOLLOWUP.LatestFollowupDate> LSQ_PEXTBASE.mx_dealer_assignment_Date
   AND  LSQ_PBASE.mx_BU='PB'
 	--and LSQ_PEXTBASE.mx_BU_sub_type='TRM'
 	AND CAST(LSQ_PBASE.ModifiedOn AS DATE) BETWEEN '2025-06-09' AND Cast(Getdate()-1 as date)  
-  --AND LSQ_PBASE.ModifiedOn > (SELECT  MAX(IMPORTEDDATE) FROM ASM_PB_T_ENQUIRY_DIM); --- 12002 for MC
 
  INSERT INTO ASM_PB_T_ENQUIRY_DIM
 SELECT DISTINCT
@@ -284,9 +296,9 @@ SELECT DISTINCT
 				--AND (CONVERT(TIME, DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))) NOT BETWEEN '08:00:00' AND '17:00:00')
 				THEN */
 			CASE 
-				WHEN CAST(DATEDIFF(MINUTE, COALESCE(LSQ_UTBASE.DueDate,LSQ_PEXTBASE.mx_Dealer_Assignment_Date ), FIRST_FOLLOWUP.FirstFollowupDate) AS INT) <= 120 THEN '<3 Hrs'
-				WHEN CAST(DATEDIFF(MINUTE, COALESCE(LSQ_UTBASE.DueDate,LSQ_PEXTBASE.mx_Dealer_Assignment_Date ), FIRST_FOLLOWUP.FirstFollowupDate) AS INT) BETWEEN 121 AND 1380 THEN '3-24 Hrs'
-				WHEN CAST(DATEDIFF(MINUTE, COALESCE(LSQ_UTBASE.DueDate,LSQ_PEXTBASE.mx_Dealer_Assignment_Date ), FIRST_FOLLOWUP.FirstFollowupDate) AS INT) > 1380 THEN '>24 Hrs' --  END
+				WHEN CAST(DATEDIFF(MINUTE, LSQ_UTBASE.DueDate,COALESCE(CRE_FIRST_FOLLOWUP.CREfollowupDate , FIRST_FOLLOWUP.FirstFollowupDate)) AS INT) <= 120 THEN '<3 Hrs'
+				WHEN CAST(DATEDIFF(MINUTE, LSQ_UTBASE.DueDate,COALESCE(CRE_FIRST_FOLLOWUP.CREfollowupDate , FIRST_FOLLOWUP.FirstFollowupDate)) AS INT) BETWEEN 121 AND 1380 THEN '3-24 Hrs'
+				WHEN CAST(DATEDIFF(MINUTE, LSQ_UTBASE.DueDate,COALESCE(CRE_FIRST_FOLLOWUP.CREfollowupDate , FIRST_FOLLOWUP.FirstFollowupDate)) AS INT) > 1380 THEN '>24 Hrs' --  END
 			/*ELSE --WHEN LSQ_PEB.mx_Non_Working_Hour IS NULL THEN 
 			CASE 
 				WHEN CAST(DATEDIFF(MINUTE, LSQ_PEXTBASE.mx_Dealer_Assignment_Date, FIRST_FOLLOWUP.FirstFollowupDate) AS INT)< 180 THEN '<3 Hrs'
@@ -335,8 +347,8 @@ FROM
   
      LEFT JOIN (select DueDate,OwnerId,RelatedEntityId,TaskType,CreatedON  from
  (SELECT DueDate,OwnerId,RelatedEntityId, TaskType,CreatedON, ROW_NUMBER()OVER(PARTITION BY RelatedEntityId ORDER BY CreatedON Asc)RNK                  
-  FROM LSQ_UserTask_Base  ) UT
-  WHERE RNK = 1 and   TaskType ='18724219-010f-11ed-8065-02dfc2d2ef6a' ) LSQ_UTBASE
+  FROM #LSQ_UTBASE  ) UT
+  WHERE RNK = 1  ) LSQ_UTBASE
   ON  --(LSQ_PBASE.OwnerId = LSQ_UTBASE.OwnerId) and
   (LSQ_PBASE.ProspectId = LSQ_UTBASE.RelatedEntityId) 
   
@@ -354,6 +366,19 @@ and mx_Custom_13 is not null ) A where RNK=1
 ON FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND FIRST_FOLLOWUP.FirstFollowupDate>LSQ_PEXTBASE.mx_dealer_assignment_Date
 
+--------------- CRE FOLLOWUP----------------
+LEFT JOIN (SELECT RelatedProspectID,CREfollowupDate, FirstIsCustomerContacted,CREFollowupScheduleDate,mx_custom_14,mx_custom_15 FROM (
+select RelatedProspectID,mx_Custom_13 as FirstIsCustomerContacted,mx_custom_3 as CREFollowupScheduleDate,
+createdon as CREfollowupDate, mx_custom_14 , mx_custom_15,
+ROW_NUMBER()OVER(PARTITION BY RelatedProspectID ORDER BY CREATEDON ASC) AS RNK 
+from LSQ_PROSPECTACTIVITY_EXTENSIONBASE  
+where ActivityEvent=237
+) A where RNK=1
+) CRE_FIRST_FOLLOWUP
+ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
+AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
+
+
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate FROM (
 select RelatedProspectID,mx_Custom_13 LatestIsCustomerContacted,mx_custom_3 as LatestFollowupScheduleDate,
@@ -366,8 +391,6 @@ and mx_Custom_13 is not null ) B where RNK=1
 ON LATEST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND LATEST_FOLLOWUP.LatestFollowupDate> LSQ_PEXTBASE.mx_dealer_assignment_Date
 
-
-  
  -------TestRIDE Logic------------------------------------------------------
   LEFT JOIN (select RelatedProspectID,STATUS , ROW_NUMBER() OVER (PARTITION BY RelatedProspectID ORDER BY createdon DESC) AS RANK1
   from 
@@ -739,5 +762,5 @@ INNER JOIN RETAIL_LINE RL ON (AL.LINEID=RL.ALLOCATIONDATALINEID)
 WHERE ED.BaseFlag=1 
 --AND LSQ_PBASE.mx_BU='PB'
 
-
 END
+GO

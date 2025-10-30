@@ -13,6 +13,7 @@ BEGIN
 /*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION				    */
 /*--------------------------------------------------------------------------------------------------*/
 /*	2024-07-04 	|	Lachmanna L		| The salesperson column has been updated to reflect the FirstName from the LSQ user table */
+ /*	2025-10-28	|	Lachmanna		 |   addded INSURER_DETAIL column Dim table        */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -44,7 +45,8 @@ RH.CDMS_BATCHNO,
 	AND ((SUBSTRING(BRANCH_MASTER.Code,6,6) BETWEEN '10000' AND '14000') 
 	OR (SUBSTRING(BRANCH_MASTER.Code,6,6) = '25669'))  AND RH.DocType NOT IN (441,1000088) THEN 'Showroom'
 	ELSE 'Command Area' 
-	END) AS SALESCHANNEL
+	END) AS SALESCHANNEL,
+   RH.INSURANCECOMPANY AS INSURER_DETAIL
 	-- INTO ASM_PB_T_RETAIL_DIM
 FROM 
 RETAIL_HEADER RH INNER JOIN COMPANY_MASTER 

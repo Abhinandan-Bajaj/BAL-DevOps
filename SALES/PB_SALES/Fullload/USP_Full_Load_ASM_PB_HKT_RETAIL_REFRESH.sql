@@ -14,6 +14,7 @@ BEGIN
 /*	2024-10-22 	|	Nikita L		| LSQ-MX_First_Source Addition                    			*/
 /*   2024-12-27 	|	Nikita	| MX_QUALIFIED_FIRST_SOURCE Changes 
      2025-03-19	|	Lachmanna		 | First Mode : Source   and subsource   add fact table        */
+ /*	2025-10-28	|	Lachmanna		 |   addded INSURER_DETAIL column Dim table        */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -42,7 +43,8 @@ RH.CDMS_BATCHNO,
 	AND ((SUBSTRING(BRANCH_MASTER.Code,6,6) BETWEEN '10000' AND '14000') 
 	OR (SUBSTRING(BRANCH_MASTER.Code,6,6) = '25669'))  AND RH.DocType NOT IN (441,1000088) THEN 'Showroom'
 	ELSE 'Command Area' 
-	END) AS SALESCHANNEL
+	END) AS SALESCHANNEL,
+   RH.INSURANCECOMPANY AS INSURER_DETAIL
 	-- INTO ASM_PB_HK_RETAIL_DIM
 FROM 
 RETAIL_HEADER RH INNER JOIN COMPANY_MASTER ON (RH.COMPANYID=COMPANY_MASTER.COMPANYID AND (COMPANY_MASTER.COMPANYTYPE = 2 ))--AND COMPANY_MASTER.COMPANYSUBTYPE is null))

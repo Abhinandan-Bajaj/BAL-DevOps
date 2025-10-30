@@ -13,6 +13,7 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------*/
 
 /*	2025-05-23 	|	Lachmanna		| Ship-to Party (Branch Code) billing data from SAP	*/
+/*	2025-10-30 	|	Lachmanna		| Branch Null values Bug	*/
 
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -64,7 +65,7 @@ INNER JOIN (
     AND PM.rnk = 1
 --testing> 
 Left  JOIN sap_LIKP ON SAP_BILLING.DELIVERY=sap_LIKP.VBELN
-Left JOIN ASM_PB_BRANCH_MASTER_DIM BM on  sap_LIKP.KUNNR=BM.BRANCH_CODE
+Left JOIN ASM_PB_HKT_BRANCH_MASTER_DIM BM on  sap_LIKP.KUNNR=BM.BRANCH_CODE
 WHERE CAST(SAP_BILLING.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date) AND
 [Distr.Chnl] IN ('55') AND DIVISION='B2' AND SAP_BILLING.CANCELLED<>'X'  
 GROUP BY

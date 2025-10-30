@@ -1,47 +1,17 @@
-/****** Object:  StoredProcedure [dbo].[USP_ASM_PB_HKT_ALLOCATION_REFRESH]    Script Date: 10/7/2025 5:02:01 PM ******/
+/****** Object:  StoredProcedure [dbo].[USP_Full_Load_ASM_PB_HKT_ALLOCATION_REFRESH]    Script Date: 6/13/2025 5:33:14 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-ALTER PROC [dbo].[USP_ASM_PB_HKT_ALLOCATION_REFRESH] AS
+alter PROC [dbo].[USP_Full_Load_ASM_PB_HKT_ALLOCATION_REFRESH] AS
 BEGIN
-/********************************************HISTORY**************************************************/
-/*--------------------------------------------------------------------------------------------------*/
-/*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION				    */
-/*--------------------------------------------------------------------------------------------------*/
-/*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
-/*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
-/*--------------------------------------------------------------------------------------------------*/
-/*--------------------------------------------------------------------------------------------------*/
-/*******************************************HISTORY**************************************************/
 
 --************************************START****************************************
+TRUNCATE TABLE ASM_PB_HK_ALLOCATION_DIM
+TRUNCATE TABLE ASM_PB_HK_ALLOCATION_FACT
 
-
-declare @ASMDim_IMPORTEDDATE date;
-set @ASMDim_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_HK_ALLOCATION_DIM)AS DATE);
-
-declare @ASMFact_IMPORTEDDATE date;
-set @ASMFact_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_HK_ALLOCATION_FACT)AS DATE);
-
-
-DECLARE @SPID INT = @@SPID,
-        @sp_name VARCHAR(128) = 'USP_ASM_PB_HKT_ALLOCATION_REFRESH';
-
-DECLARE @StartDate_utc1 DATETIME = GETDATE(),
-            @EndDate_utc1 DATETIME,
-			@StartDate_ist1 DATETIME = (DATEADD(mi,30,(DATEADD(hh,5,getdate())))),
-            @EndDate_ist1 DATETIME,
-            @Duration_sec1 bigint,
-			@Duration1 varchar(15),
-			@table_name1 VARCHAR(128) = 'ASM_PB_HK_ALLOCATION_DIM', 
-            @SourceCount1 BIGINT,  
-            @TargetCount1 BIGINT,   
-            @Status1 VARCHAR(10),
-            @ErrorMessage1 VARCHAR(MAX); 
-
-BEGIN TRY
 --1.Allocation Dim
+--TRUNCATE TABLE ASM_PB_ALLOCATION_DIM
 INSERT INTO ASM_PB_HK_ALLOCATION_DIM
 SELECT DISTINCT 
 AH.HEADERID AS PK_ALLOCATIONHEADERID,
@@ -49,6 +19,7 @@ CAST(AH.DOCDATE AS DATE) AS ALLOCATIONDATE,
 GETDATE() AS CREATEDDATETIME,
 AH.IMPORTEDDATE,
 AH.CDMS_BATCHNO
+--INTO ASM_PB_ALLOCATION_DIM
 FROM ALLOCATION_HEADER  AH
 INNER JOIN COMPANY_MASTER
 ON (AH.COMPANYID=COMPANY_MASTER.COMPANYID AND
@@ -59,11 +30,29 @@ INNER JOIN (select *, Row_number() over (partition by MODELCODE order by MODELCO
 	from ASM_PB_HKT_PRODUCT_DIM) PM  
 	ON  PM.Modelcode = IM.Code and PM.BRAND <>'TRIUMPH' and rnk = 1
 WHERE  
---CAST(AH.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date)
-Cast(AH.IMPORTEDDATE as date)>=@ASMDim_IMPORTEDDATE
+CAST(AH.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date)
+--ALLOCATION_HEADER.IMPORTEDDATE>(SELECT MAX(IMPORTEDDATE)  FROM ASM_PB_ALLOCATION_DIM)
 
+--oLD logic
+
+INSERT INTO ASM_PB_HK_ALLOCATION_DIM
+SELECT DISTINCT 
+ALLOCATION_HEADER.HEADERID AS PK_ALLOCATIONHEADERID,
+CAST(ALLOCATION_HEADER.DOCDATE AS DATE) AS ALLOCATIONDATE,
+GETDATE() AS CREATEDDATETIME,
+ALLOCATION_HEADER.IMPORTEDDATE,
+ALLOCATION_HEADER.CDMS_BATCHNO
+--INTO ASM_PB_ALLOCATION_DIM
+FROM ALLOCATION_HEADER 
+INNER JOIN COMPANY_MASTER
+ON (ALLOCATION_HEADER.COMPANYID=COMPANY_MASTER.COMPANYID AND
+(COMPANY_MASTER.COMPANYTYPE = 2 AND COMPANY_MASTER.COMPANYSUBTYPE is null))
+WHERE  
+CAST(ALLOCATION_HEADER.DOCDATE AS DATE) BETWEEN '2020-04-01' AND  '2025-06-08'
+--ALLOCATION_HEADER.IMPORTEDDATE>(SELECT MAX(IMPORTEDDATE)  FROM ASM_PB_ALLOCATION_DIM)
 -----------------------------------------------------------------------------------------------
 DELETE FROM ASM_PB_HK_ALLOCATION_DIM WHERE ALLOCATIONDATE>Cast(Getdate()-1 as date)
+
 
 --Dedup:
 ;WITH CTE AS                  
@@ -77,6 +66,7 @@ DELETE FROM CTE
 
 --***************************************************************************************
 --2.Allocation Fact:
+--Truncate table ASM_PB_ALLOCATION_FACT
 INSERT INTO ASM_PB_HK_ALLOCATION_FACT
 SELECT 
 DISTINCT
@@ -98,6 +88,7 @@ Cast(0 as int) As FK_MODEL,
 Cast(0 As decimal(19,0)) As FLAG,
 NULL AS TEHSILID,
 NULL AS SALESPERSON
+--INTO  ASM_PB_ALLOCATION_FACT
 FROM 
 ALLOCATION_HEADER AH 
 INNER JOIN COMPANY_MASTER CM ON (AH.COMPANYID=CM.COMPANYID AND (CM.COMPANYTYPE = 2 AND CM.COMPANYSUBTYPE is null))
@@ -108,8 +99,8 @@ JOIN ITEM_MASTER IM ON (IM.ItemId=AL.ItemID)
 	ON  PM.Modelcode = IM.Code and PM.BRAND <>'TRIUMPH' and rnk = 1
 LEFT JOIN ITEMVARMATRIX_MASTER IV ON (AL.VARMATRIXID=IV.ITEMVARMATRIXID)
 WHERE 
---CAST(AH.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date) 
-Cast(AH.IMPORTEDDATE as date)>=@ASMFact_IMPORTEDDATE
+CAST(AH.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date) 
+--AH.IMPORTEDDATE>(SELECT MAX(IMPORTEDDATE) FROM ASM_PB_ALLOCATION_FACT)
 GROUP BY
 CM.CODE,
 IM.CODE+IV.CODE,
@@ -120,6 +111,51 @@ CM.COMPANYTYPE,
 AH.BRANCHID,
 AH.IMPORTEDDATE,
 IM.CODE 
+
+
+--- OLD LOGIC
+INSERT INTO ASM_PB_HK_ALLOCATION_FACT
+SELECT 
+DISTINCT
+CM.CODE AS DEALERCODE,
+IM.CODE+IV.CODE As SKU,
+Cast(0 as int) AS FK_DealerCode,
+Cast(0 as int) AS FK_SKU,
+10007 AS FK_TYPE_ID,
+CAST(AH.DOCDATE AS DATE) AS DATE,
+AL.LINEID AS AllocationLineID,
+AL.DOCID AS FK_AllocationDocID,
+CM.COMPANYTYPE AS COMPANYTYPE,
+AH.BRANCHID,
+COUNT(AH.HEADERID) AS ACTUALQUANTITY,
+getdate() as LASTUPDATEDDATETIME,
+AH.IMPORTEDDATE,
+IM.CODE As MODEL,
+Cast(0 as int) As FK_MODEL,
+Cast(0 As decimal(19,0)) As FLAG,
+NULL AS TEHSILID,
+NULL AS SALESPERSON
+--INTO  ASM_PB_ALLOCATION_FACT
+FROM 
+ALLOCATION_HEADER AH 
+INNER JOIN COMPANY_MASTER CM ON (AH.COMPANYID=CM.COMPANYID AND (CM.COMPANYTYPE = 2 AND CM.COMPANYSUBTYPE is null))
+INNER JOIN ALLOCATION_LINE AL ON (AH.HEADERID=AL.DOCID)
+JOIN ITEM_MASTER IM ON (IM.ItemId=AL.ItemID)
+LEFT JOIN ITEMVARMATRIX_MASTER IV ON (AL.VARMATRIXID=IV.ITEMVARMATRIXID)
+WHERE 
+CAST(AH.DOCDATE AS DATE) BETWEEN '2020-04-01' AND  '2025-06-08'
+--AH.IMPORTEDDATE>(SELECT MAX(IMPORTEDDATE) FROM ASM_PB_ALLOCATION_FACT)
+GROUP BY
+CM.CODE,
+IM.CODE+IV.CODE,
+CAST(AH.DOCDATE AS DATE),
+AL.LINEID,
+AL.DOCID,
+CM.COMPANYTYPE,
+AH.BRANCHID,
+AH.IMPORTEDDATE,
+IM.CODE 
+
 
 DELETE FROM ASM_PB_HK_ALLOCATION_FACT WHERE DATE>Cast(Getdate()-1 as date)
 
@@ -141,7 +177,7 @@ update B set B.FK_DEALERCODE=C.PK_DEALERCODE from [dbo].ASM_PB_HK_ALLOCATION_FAC
 
 --**************************************************************************************************************
 
-EXEC [USP_ASM_PB_T_ALLOCATION_REFRESH];
+EXEC [USP_Full_Load_ASM_PB_T_ALLOCATION_REFRESH];
 
 TRUNCATE TABLE ASM_PB_HKT_ALLOCATION_DIM;
 INSERT into ASM_PB_HKT_ALLOCATION_DIM
@@ -149,33 +185,6 @@ Select*,'PB KTM' as Brand from ASM_PB_HK_ALLOCATION_DIM;
 INSERT into ASM_PB_HKT_ALLOCATION_DIM
 Select*,'PB TRM' as Brand from ASM_PB_T_ALLOCATION_DIM;
 
-
-----------------------------------Audit Log Target
-    END TRY
-    BEGIN CATCH
-        SET @Status1 = 'FAILURE';
-        SET @ErrorMessage1 = ERROR_MESSAGE();
-        THROW;  
-    END CATCH
-    SET @EndDate_utc1 = GETDATE();
-	SET @EndDate_ist1 = (DATEADD(mi,30,(DATEADD(hh,5,getdate()))));
-    SET @Duration_sec1 = DATEDIFF(SECOND, @StartDate_ist1, @EndDate_ist1);
-	SET @Duration1 = CONVERT(VARCHAR(8), DATEADD(SECOND, @Duration_sec1, 0), 108);
-    EXEC [USP_Audit_Balance_Control_Logs] 
-	     @SPID,
-        @sp_name,
-		@table_name1,
-        'Sales',
-        'PB-KTM',
-        @StartDate_utc1,
-        @EndDate_utc1,
-		@StartDate_ist1,
-        @EndDate_ist1,
-        @Duration1,  
-        '0',
-        '0',
-        @Status1,
-        @ErrorMessage1;
 
 
 END

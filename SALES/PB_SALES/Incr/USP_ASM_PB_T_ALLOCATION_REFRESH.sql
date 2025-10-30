@@ -13,6 +13,7 @@ BEGIN
 /*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION				    */
 /*--------------------------------------------------------------------------------------------------*/
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
+/*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -22,7 +23,7 @@ BEGIN
 
 
 declare @ASMDim_IMPORTEDDATE date;
-set @ASMDim_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_T_ALLOCATION_FACT)AS DATE);
+set @ASMDim_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_T_ALLOCATION_DIM)AS DATE);
 
 declare @ASMFact_IMPORTEDDATE date;
 set @ASMFact_IMPORTEDDATE = CAST((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_T_ALLOCATION_FACT)AS DATE);

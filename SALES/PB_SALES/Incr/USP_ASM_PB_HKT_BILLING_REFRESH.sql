@@ -12,8 +12,8 @@ BEGIN
 /*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION				      */
 /*--------------------------------------------------------------------------------------------------*/
 
-/*	2025-05-23 	|	Lachmanna		| Ship-to Party (Branch Code) billing data from SAP	*/
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
+/*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
 
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/

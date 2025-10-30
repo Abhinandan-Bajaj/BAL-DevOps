@@ -11,6 +11,7 @@ BEGIN
 /*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION				                        	*/
 /*--------------------------------------------------------------------------------------------------*/
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
+/*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
 --***************************START*****************************
@@ -60,7 +61,7 @@ WHERE
  --CAST(BOOKING_HEADER.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date) AND 
 --BOOKING_HEADER.STATUS = 'Open' AND 
 BOOKING_HEADER.DOCTYPE=1000050
-AND Cast(BOOKING_HEADER.IMPORTEDDATE as date)>@ASMDim_IMPORTEDDATE
+AND Cast(BOOKING_HEADER.IMPORTEDDATE as date)>=@ASMDim_IMPORTEDDATE
 
 Delete from ASM_PB_HK_BOOKING_DIM Where Cast(BOOKINGDATE as Date)>Cast(Getdate()-1 as date)
 
@@ -200,3 +201,4 @@ select *,'PB-TRM' from ASM_PB_T_BOOKING_DIM
         @Status1,
         @ErrorMessage1;
 END
+GO

@@ -12,22 +12,18 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------*/
 /*    DATE   	|	CREATED/MODIFIED BY		|					CHANGE DESCRIPTION					*/
 /*--------------------------------------------------------------------------------------------------*/
-/*	2024-06-19 	|	RICHA	| Created for displaying Sales view of Testrides      			
-    2024-07-24 	|	RICHA	| Created for displaying Sales view of Followups */
-/*  2024-10-30 	|	RICHA	| Created for displaying Sales view of Visited           			*/
-/*	2024-12-27 	|	Nikita L		| LSQ-MX_qualified_First_Source Addition                  */
-/*	2025-03-19 	|	Lachmanna		| First Mode Source and sub source  Addition	                */
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
+/*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
 ------------------------------------------------------------------------------------------------------------------------------------------
 
 
-declare @ASMDim_IMPORTEDDATE date;
-set @ASMDim_IMPORTEDDATE = cast ((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_HK_TEST_RIDE_FACT where FK_TYPE_ID='10008') as date);
+declare @ASMFact1_IMPORTEDDATE date;
+set @ASMFact1_IMPORTEDDATE = cast ((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_HK_TEST_RIDE_FACT where FK_TYPE_ID='10008') as date);
 
 declare @ASMFact_IMPORTEDDATE date;
-set @ASMFact_IMPORTEDDATE = cast ((SELECT ISNULL(MAX(IMPORTEDDATE), '2023-04-01') FROM ASM_PB_HK_TEST_RIDE_FACT where FK_TYPE_ID='10011') as date);
+set @ASMFact_IMPORTEDDATE = cast ((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_HK_TEST_RIDE_FACT where FK_TYPE_ID='10011') as date);
 
 declare @ASMFollowp_IMPORTEDDATE date;
 set @ASMFollowp_IMPORTEDDATE = cast ((SELECT MAX(IMPORTEDDATE) FROM ASM_PB_HK_FOLLOWUP_FACT) as date);
@@ -157,7 +153,7 @@ SELECT
     WHERE LSQ_PACTEXTBASE.ActivityEvent=12002 
 	--and LSQ_PEXTBASE.mx_BU_sub_type='TRM'
     AND LSQ_PEXTBASE.mx_Dealer_Assignment_Date  IS NOT NULL
-    AND CAST( LSQ_TESTRIDE.CREATEDON AS DATE)  >=@ASMDim_IMPORTEDDATE
+    AND CAST( LSQ_TESTRIDE.CREATEDON AS DATE)  >=@ASMFact1_IMPORTEDDATE
   ) TMP
 	GROUP BY 
 DEALERCODE, SKU,FK_DEALERCODE, FK_SKU,  FK_TYPE_ID,DATE,ENQUIRYLINEID,
@@ -472,3 +468,4 @@ EXEC USP_ASM_PB_T_TEST_RIDE_REFRESH;
         @ErrorMessage1;
 
 END 
+GO

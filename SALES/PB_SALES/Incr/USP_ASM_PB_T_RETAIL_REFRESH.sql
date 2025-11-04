@@ -14,6 +14,7 @@ BEGIN
 /*--------------------------------------------------------------------------------------------------*/
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
 /*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
+ /*	2025-10-28	|	Lachmanna		 |   addded INSURER_DETAIL column Dim table        */
 /*--------------------------------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -62,7 +63,8 @@ RH.CDMS_BATCHNO,
 	AND ((SUBSTRING(BRANCH_MASTER.Code,6,6) BETWEEN '10000' AND '14000') 
 	OR (SUBSTRING(BRANCH_MASTER.Code,6,6) = '25669'))  AND RH.DocType NOT IN (441,1000088) THEN 'Showroom'
 	ELSE 'Command Area' 
-	END) AS SALESCHANNEL
+	END) AS SALESCHANNEL,
+    RH.INSURANCECOMPANY AS INSURER_DETAIL
 FROM 
 RETAIL_HEADER RH INNER JOIN COMPANY_MASTER 
 ON (RH.COMPANYID=COMPANY_MASTER.COMPANYID AND COMPANY_MASTER.COMPANYTYPE = 2 )

@@ -14,6 +14,8 @@ BEGIN
 
 /*  2025-07-18 	|	Lachmanna		        | Newly Added script for K+T        */
 /*  2025-10-07 	|	Lachmanna		        | added ABC code  and applied date casting        */
+/*	2025-10-30 	|	Lachmanna		| Branch Null values Bug	*/
+
 
 /*--------------------------------------------------------------------------------------------------*/
 /*******************************************HISTORY**************************************************/
@@ -77,7 +79,7 @@ INNER JOIN (
     PM.MODELCODE =  LEFT(SAP_BILLING.MATERIAL,6) 
     AND PM.rnk = 1
 Left  JOIN sap_LIKP ON SAP_BILLING.DELIVERY=sap_LIKP.VBELN
-Left JOIN ASM_PB_BRANCH_MASTER_DIM BM on  sap_LIKP.KUNNR=BM.BRANCH_CODE
+Left JOIN ASM_PB_HKT_BRANCH_MASTER_DIM BM on  sap_LIKP.KUNNR=BM.BRANCH_CODE
 WHERE --CAST(SAP_BILLING.DOCDATE AS DATE) BETWEEN '2025-06-09' AND  Cast(Getdate()-1 as date) AND 
  cast(SAP_BILLING.DOCDATE as date)> @ASMFact_IMPORTEDDATE
 and [Distr.Chnl] IN ('55') AND DIVISION='B2' AND SAP_BILLING.CANCELLED<>'X'  

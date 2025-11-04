@@ -41,7 +41,7 @@ WITH
   	DISTRIBUTION = HASH(RelatedEntityId),
 	CLUSTERED COLUMNSTORE INDEX
 );
-DECLARE @UTThreshold DATE = DATEADD(DAY, -30, GETDATE());
+
 INSERT INTO #LSQ_UTBASE
 SELECT   OwnerId,DueDate,RelatedEntityId, TaskType,CreatedON --Into #LSQ_UTBASE                 
 FROM LSQ_UserTask_Base U  WHERE TaskType in(
@@ -198,6 +198,7 @@ where ActivityEvent=237
 ) CRE_FIRST_FOLLOWUP
 ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
+and LSQ_PEB.mx_Service_Lead<>'Yes'
 
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate FROM (
@@ -377,7 +378,7 @@ where ActivityEvent=237
 ) CRE_FIRST_FOLLOWUP
 ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
-
+and LSQ_PEB.mx_Service_Lead<>'Yes'
 
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate FROM (

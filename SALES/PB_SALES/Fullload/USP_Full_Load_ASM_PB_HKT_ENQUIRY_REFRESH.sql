@@ -1,4 +1,5 @@
 
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -326,6 +327,7 @@ where ActivityEvent=237
 ) CRE_FIRST_FOLLOWUP
 ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
+and LSQ_PEB.mx_Service_Lead<>'Yes'
 
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate,mx_custom_14,mx_custom_15 FROM (
@@ -517,6 +519,7 @@ where ActivityEvent=237
 ) CRE_FIRST_FOLLOWUP
 ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
+and  LSQ_PEB.mx_Service_Lead<>'Yes'
 
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate,mx_custom_14,mx_custom_15 FROM (

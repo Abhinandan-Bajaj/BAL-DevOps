@@ -216,6 +216,10 @@ WITH
 );
 
 
+IF(OBJECT_ID('TempDB..#LSQ_ProspectId','U') IS NOT NULL)
+BEGIN
+    DROP TABLE #LSQ_ProspectId
+END
 CREATE TABLE #LSQ_ProspectId (
     ProspectId VARCHAR(100)  )
 WITH ( DISTRIBUTION = HASH(ProspectId),
@@ -390,6 +394,7 @@ where ActivityEvent=237
 ) CRE_FIRST_FOLLOWUP
 ON CRE_FIRST_FOLLOWUP.RelatedProspectID=LSQ_PBASE.ProspectId
 AND DATEADD(mi,30,(DATEADD(hh,5,CRE_FIRST_FOLLOWUP.CREfollowupDate))) > DATEADD(mi,30,(DATEADD(hh,5,LSQ_PEXTBASE.mx_Dealer_Assignment_Date)))
+and LSQ_PEB.mx_Service_Lead<>'Yes'
 
 ---------------LATEST FOLLOWUP ------------------------------------------
 LEFT JOIN (SELECT RelatedProspectID,LatestFollowupDate, LatestIsCustomerContacted,LatestFollowupScheduleDate,mx_custom_14,mx_custom_15 FROM (

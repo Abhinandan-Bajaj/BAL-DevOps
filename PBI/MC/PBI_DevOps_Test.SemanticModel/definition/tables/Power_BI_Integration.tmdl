@@ -1,0 +1,119 @@
+table Power_BI_Integration
+	lineageTag: aee82f4e-3294-43d7-8f59-2b5bd886d4d6
+
+	column 'Area Path'
+		dataType: string
+		lineageTag: 04797385-e350-4cd7-a98f-084b804077ed
+		summarizeBy: none
+		sourceColumn: Area Path
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Assigned To'
+		dataType: string
+		lineageTag: d787cdeb-a84e-402a-a37f-99c466490b98
+		summarizeBy: none
+		sourceColumn: Assigned To
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Iteration Path'
+		dataType: string
+		lineageTag: 347858c3-b33c-4159-a7dc-17705b582b16
+		summarizeBy: none
+		sourceColumn: Iteration Path
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Work Item Id'
+		dataType: int64
+		formatString: 0
+		lineageTag: 0294915b-3978-41f2-aac7-a25c2eeaadf4
+		summarizeBy: count
+		sourceColumn: Work Item Id
+
+		annotation SummarizationSetBy = Automatic
+
+	column Title
+		dataType: string
+		lineageTag: 6c9e97fb-efdb-4b64-a45a-47f0fe8446ab
+		summarizeBy: none
+		sourceColumn: Title
+
+		annotation SummarizationSetBy = Automatic
+
+	column State
+		dataType: string
+		lineageTag: e25a4124-6a77-47a5-9d97-8d578877990e
+		summarizeBy: none
+		sourceColumn: State
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Work Item Type'
+		dataType: string
+		lineageTag: cf429915-8a8a-4dfa-8db5-2cb5d6587bc0
+		summarizeBy: none
+		sourceColumn: Work Item Type
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Created Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 416eff4f-79cc-44bd-ae24-7c6526b1c40f
+		summarizeBy: none
+		sourceColumn: Created Date
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Closed Date'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: e375f3f5-035b-445f-b340-0567fba81292
+		summarizeBy: none
+		sourceColumn: Closed Date
+
+		annotation SummarizationSetBy = Automatic
+
+	column Date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 017f261f-bca7-45d2-99c8-bfea121e09d6
+		summarizeBy: none
+		sourceColumn: Date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 'Is Current'
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 91c3617f-b1c1-45fe-866b-8aa086c645cb
+		summarizeBy: none
+		sourceColumn: Is Current
+
+		annotation SummarizationSetBy = Automatic
+
+	column Ageing = NETWORKDAYS(Power_BI_Integration[Closed Date],Power_BI_Integration[Created Date])
+		formatString: 0
+		lineageTag: c6d61951-0517-4edf-a904-8cf71188d58a
+		summarizeBy: sum
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Power_BI_Integration = m
+		mode: import
+		source =
+				let
+				    Source = VSTS.AnalyticsViews("Bajaj-Analytics", "Power BI - Ops and Enhancements", []),
+				    #"Private Views_Folder" = Source{[Id="Private Views",Kind="Folder"]}[Data],
+				    #"739ca862-3e54-4c01-bdeb-fce833464a85_Table" = #"Private Views_Folder"{[Id="739ca862-3e54-4c01-bdeb-fce833464a85",Kind="Table"]}[Data]
+				in
+				    #"739ca862-3e54-4c01-bdeb-fce833464a85_Table"
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

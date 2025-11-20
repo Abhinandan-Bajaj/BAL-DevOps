@@ -1,0 +1,94 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.3.0/schema.json",
+  "name": "000baf0534dbeb560d6c",
+  "position": {
+    "x": 669.642037555068,
+    "y": 27.444345801437212,
+    "z": 3000,
+    "height": 661.40873381463678,
+    "width": 610.63669408197791,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Power_BI_Integration"
+                    }
+                  },
+                  "Property": "Assigned To"
+                }
+              },
+              "queryRef": "Power_BI_Integration.Assigned To",
+              "nativeQueryRef": "Assigned To"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Power_BI_Integration"
+                    }
+                  },
+                  "Property": "Iteration Path"
+                }
+              },
+              "queryRef": "Power_BI_Integration.Iteration Path",
+              "nativeQueryRef": "Iteration Path"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Power_BI_Integration"
+                    }
+                  },
+                  "Property": "State"
+                }
+              },
+              "queryRef": "Power_BI_Integration.State",
+              "nativeQueryRef": "State"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Power_BI_Integration"
+                    }
+                  },
+                  "Property": "Title"
+                }
+              },
+              "queryRef": "Power_BI_Integration.Title",
+              "nativeQueryRef": "Title"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Power_BI_Integration"
+                    }
+                  },
+                  "Property": "Work Item Type"
+                }
+              },
+              "queryRef": "Power_BI_Integration.Work Item Type",
+              "nativeQueryRef": "Work Item Type"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
